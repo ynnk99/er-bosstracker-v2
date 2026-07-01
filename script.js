@@ -2991,30 +2991,34 @@ function loadNGRuns() {
     .then(function(r) { return r.text(); })
     .then(function(text) {
       var json = JSON.parse(text.substring(47).slice(0, -2));
-      var cols = (json.table && json.table.cols) ? json.table.cols : [];
       var rows = (json.table && json.table.rows) ? json.table.rows : [];
 
-      // Schutz gegen einen bekannten gviz-Effekt: existiert der angeforderte
-      // Tab-Name (noch) nicht, liefert Google manchmal STILL einen anderen
-      // Tab zurück statt eines Fehlers (z.B. den riesigen OBS_Overlay-Tab).
-      // Unser echter Meta-Tab hat nur 3 Spalten – ein Fallback-Tab mit
-      // Boss-Daten hat deutlich mehr. Das ist ein robusteres Signal als die
-      // Kopfzeile, da gviz die Kopfzeile je nach Spaltentyp-Konsistenz mal
-      // in den Daten belässt und mal automatisch herausfiltert.
-      var looksLikeMetaSheet = cols.length > 0 && cols.length <= 4;
-
       var runs = [];
-      if (looksLikeMetaSheet) {
-        rows.forEach(function(row) {
-          if (!row || !row.c) return;
-          var label      = row.c[0] && row.c[0].v ? String(row.c[0].v).trim() : "";
-          var sheetName  = row.c[1] && row.c[1].v ? String(row.c[1].v).trim() : "";
-          var archivedAt = row.c[2] && row.c[2].v ? String(row.c[2].v).trim() : "";
-          if (!label || !sheetName) return;
-          if (label === "Label" && sheetName === "SheetName") return; // Kopfzeile überspringen, falls vorhanden
-          runs.push({ label: label, sheetName: sheetName, archivedAt: archivedAt });
-        });
-      }
+      rows.forEach(function(row) {
+        if (!row || !row.c) return;
+        var label      = row.c[0] && row.c[0].v ? String(row.c[0].v).trim() : "";
+        var sheetName  = row.c[1] && row.c[1].v ? String(row.c[1].v).trim() : "";
+        var archivedAt = row.c[2] && row.c[2].v ? String(row.c[2].v).trim() : "";
+        // Nur echte NG-Run-Einträge zulassen: Label muss exakt "NG" oder
+        // "NG+<Zahl>" sein, SheetName muss exakt unserem Namensschema
+        // entsprechen. Das schützt zuverlässig gegen den Fall, dass gviz
+        // mangels vorhandenem "_NGPLUS_META"-Tab still auf einen anderen Tab
+        // (z.B. OBS_Overlay) zurückfällt und dessen Gebiets-/Bossnamen
+        // fälschlich als Run-Label interpretiert würden – egal wie viele
+        // Spalten oder welche Kopfzeile dieser Fallback-Tab hat.
+        if (!/^NG(\+\d+)?$/.test(label)) return;
+        if (!/^ARCHIV_NG\d*$/.test(sheetName)) return;
+        runs.push({ label: label, sheetName: sheetName, archivedAt: archivedAt });
+      });
+
+      // Nach Reihenfolge sortieren (NG, NG+1, NG+2, …), falls die Zeilen
+      // aus irgendeinem Grund nicht in Erstellungsreihenfolge zurückkommen.
+      runs.sort(function(a, b) {
+        var na = a.label === "NG" ? 0 : parseInt(a.label.replace("NG+", ""), 10);
+        var nb = b.label === "NG" ? 0 : parseInt(b.label.replace("NG+", ""), 10);
+        return na - nb;
+      });
+
       ngRuns = runs;
       currentLiveLabel = runs.length === 0 ? "NG" : "NG+" + runs.length;
       renderRunSelector();
