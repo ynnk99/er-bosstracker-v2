@@ -4,8 +4,8 @@
 
 const TWITCH_CLIENT_ID   = "n3oqt780bnsi3lb2gzinxdbrrazork";
 const TWITCH_REDIRECT_URI = window.location.origin + window.location.pathname;
-const APPS_SCRIPT_URL    = "https://script.google.com/macros/s/AKfycbysgMpFsSRjmtOX__wIjwtB-ELoIDkwn8hnI8deRsuq-_OjLiejefpwQYERpzumyW1P/exec";
-const TOOLBOX_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbysgMpFsSRjmtOX__wIjwtB-ELoIDkwn8hnI8deRsuq-_OjLiejefpwQYERpzumyW1P/exec";
+const APPS_SCRIPT_URL    = "https://script.google.com/macros/s/AKfycbzTt2y1Cgt7wzQpBGJC57LFa8B2o90MmkeJXuf83lDxC8aUyJPhzu6O_jJm4J65j5ri/exec";
+const TOOLBOX_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzTt2y1Cgt7wzQpBGJC57LFa8B2o90MmkeJXuf83lDxC8aUyJPhzu6O_jJm4J65j5ri/exec";
 
 const ALLOWED_USERS = [
   "ynnk99",
@@ -14,7 +14,7 @@ const ALLOWED_USERS = [
   "Deeichkind",
 ];
 
-const SPREADSHEET_ID = "1_yCgMCLdpTJ2YzXMD49cNqGGERivsGHyBsRrQqE5LXE";
+const SPREADSHEET_ID = "1r9BzZJYFrk4rQLlMn4ZPBBUuc8u_peqwThTi1UTCQcE";
 
 // ── NG+ ─────────────────────────────────────────────────────────────────
 // Der "lebende" Tab, in dem aktuell gespielt/bearbeitet wird.
@@ -2992,15 +2992,26 @@ function loadNGRuns() {
     .then(function(text) {
       var json = JSON.parse(text.substring(47).slice(0, -2));
       var rows = (json.table && json.table.rows) ? json.table.rows : [];
+
+      // Schutz gegen einen bekannten gviz-Effekt: existiert der angeforderte
+      // Tab-Name (noch) nicht, liefert Google manchmal STILL den Standard-Tab
+      // zurück statt eines Fehlers. Wir prüfen deshalb die Kopfzeile – nur
+      // wenn sie exakt "Label / SheetName / ArchivedAt" lautet, vertrauen
+      // wir den Daten. Sonst gibt es (noch) keinen echten Meta-Tab.
+      var header = rows[0] && rows[0].c ? rows[0].c : [];
+      var headerOk = header[0] && String(header[0].v).trim() === "Label"
+                  && header[1] && String(header[1].v).trim() === "SheetName";
+
       var runs = [];
-      // Zeile 1 = Kopfzeile ("Label | SheetName | ArchivedAt"), ab Zeile 2 Daten
-      rows.forEach(function(row, i) {
-        if (i === 0 || !row || !row.c) return;
-        var label      = row.c[0] && row.c[0].v ? String(row.c[0].v).trim() : "";
-        var sheetName  = row.c[1] && row.c[1].v ? String(row.c[1].v).trim() : "";
-        var archivedAt = row.c[2] && row.c[2].v ? String(row.c[2].v).trim() : "";
-        if (label && sheetName) runs.push({ label: label, sheetName: sheetName, archivedAt: archivedAt });
-      });
+      if (headerOk) {
+        rows.forEach(function(row, i) {
+          if (i === 0 || !row || !row.c) return;
+          var label      = row.c[0] && row.c[0].v ? String(row.c[0].v).trim() : "";
+          var sheetName  = row.c[1] && row.c[1].v ? String(row.c[1].v).trim() : "";
+          var archivedAt = row.c[2] && row.c[2].v ? String(row.c[2].v).trim() : "";
+          if (label && sheetName) runs.push({ label: label, sheetName: sheetName, archivedAt: archivedAt });
+        });
+      }
       ngRuns = runs;
       currentLiveLabel = runs.length === 0 ? "NG" : "NG+" + runs.length;
       renderRunSelector();
@@ -3100,17 +3111,25 @@ function startNGPlusRun() {
   )
   .then(function(r) { return r.text(); })
   .then(function(t) {
+    if (t && t.indexOf("OK:") === 0) {
+      showToast("✔ NG+ gestartet! Der neue Durchgang beginnt jetzt.", 4000);
+      setTimeout(function() {
+        loadNGRuns();
+        loadData();
+        loadClips();
+        loadBingo();
+      }, 1500);
+      return;
+    }
     if (t && t.indexOf("unauthorized") !== -1) {
       showToast("⚠ Keine Berechtigung für NG+ (nur Admins).", 5000);
       return;
     }
-    showToast("✔ NG+ gestartet! Der neue Durchgang beginnt jetzt.", 4000);
-    setTimeout(function() {
-      loadNGRuns();
-      loadData();
-      loadClips();
-      loadBingo();
-    }, 1500);
+    // Jede andere Antwort (z.B. "ERROR:unknown action" bei nicht neu deploytem
+    // Apps Script, oder ein anderer serverseitiger Fehler) ist KEIN Erfolg –
+    // hier wurde weder archiviert noch zurückgesetzt.
+    console.error("[NG+] Unerwartete Server-Antwort:", t);
+    showToast("⚠ NG+ fehlgeschlagen: " + (t || "keine Antwort vom Server") + " — bitte Apps-Script-Deployment prüfen.", 7000);
   })
   .catch(function(err) {
     console.error("[NG+] Fehler:", err);
