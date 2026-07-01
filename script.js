@@ -1489,14 +1489,14 @@ function renderRanking(allBosses) {
     var doneBossCount = allBosses.filter(function(b) { return b.done; }).length;
     subtitle.textContent = top.length > 0
       ? "— Top " + top.length + " von " + doneBossCount + " erledigten Bossen"
-      : "— Du ist noch nicht gestorben - noch.";
+      : "— Du bist noch nicht gestorben - noch.";
   }
 
   var listEl = document.getElementById("ranking-list");
   if (!listEl) return;
 
   if (top.length === 0) {
-    listEl.innerHTML = '<div class="ranking-empty">Du ist noch nicht gestorben - noch.</div>';
+    listEl.innerHTML = '<div class="ranking-empty">Du bist noch nicht gestorben - noch.</div>';
     return;
   }
 
