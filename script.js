@@ -9,9 +9,6 @@ const TOOLBOX_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbysgMpFsSRjm
 
 const ALLOWED_USERS = [
   "ynnk99",
-  "mahluna",
-  "der_gude_nico",
-  "Deeichkind",
 ];
 
 const SPREADSHEET_ID = "1_yCgMCLdpTJ2YzXMD49cNqGGERivsGHyBsRrQqE5LXE";
@@ -54,7 +51,6 @@ const MAIN_BOSSES = new Set([
   "Margit, das Grausame Mal",
   "Godrick der Verpflanzte",
   "Rennala, Königin des Vollmonds",
-  "Roter Wolf von Radagon",
   "Sternengeißel Radahn",
   "Götterverschlingende Schlange / Rykard, Fürst der Blasphemie",
   "Drachenbaumwächter",
