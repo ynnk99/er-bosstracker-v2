@@ -14,7 +14,7 @@ const ALLOWED_USERS = [
   "Deeichkind",
 ];
 
-const SPREADSHEET_ID = "1r9BzZJYFrk4rQLlMn4ZPBBUuc8u_peqwThTi1UTCQcE";
+const SPREADSHEET_ID = "1_yCgMCLdpTJ2YzXMD49cNqGGERivsGHyBsRrQqE5LXE";
 
 // ── NG+ ─────────────────────────────────────────────────────────────────
 // Der "lebende" Tab, in dem aktuell gespielt/bearbeitet wird.
@@ -2991,25 +2991,28 @@ function loadNGRuns() {
     .then(function(r) { return r.text(); })
     .then(function(text) {
       var json = JSON.parse(text.substring(47).slice(0, -2));
+      var cols = (json.table && json.table.cols) ? json.table.cols : [];
       var rows = (json.table && json.table.rows) ? json.table.rows : [];
 
       // Schutz gegen einen bekannten gviz-Effekt: existiert der angeforderte
-      // Tab-Name (noch) nicht, liefert Google manchmal STILL den Standard-Tab
-      // zurück statt eines Fehlers. Wir prüfen deshalb die Kopfzeile – nur
-      // wenn sie exakt "Label / SheetName / ArchivedAt" lautet, vertrauen
-      // wir den Daten. Sonst gibt es (noch) keinen echten Meta-Tab.
-      var header = rows[0] && rows[0].c ? rows[0].c : [];
-      var headerOk = header[0] && String(header[0].v).trim() === "Label"
-                  && header[1] && String(header[1].v).trim() === "SheetName";
+      // Tab-Name (noch) nicht, liefert Google manchmal STILL einen anderen
+      // Tab zurück statt eines Fehlers (z.B. den riesigen OBS_Overlay-Tab).
+      // Unser echter Meta-Tab hat nur 3 Spalten – ein Fallback-Tab mit
+      // Boss-Daten hat deutlich mehr. Das ist ein robusteres Signal als die
+      // Kopfzeile, da gviz die Kopfzeile je nach Spaltentyp-Konsistenz mal
+      // in den Daten belässt und mal automatisch herausfiltert.
+      var looksLikeMetaSheet = cols.length > 0 && cols.length <= 4;
 
       var runs = [];
-      if (headerOk) {
-        rows.forEach(function(row, i) {
-          if (i === 0 || !row || !row.c) return;
+      if (looksLikeMetaSheet) {
+        rows.forEach(function(row) {
+          if (!row || !row.c) return;
           var label      = row.c[0] && row.c[0].v ? String(row.c[0].v).trim() : "";
           var sheetName  = row.c[1] && row.c[1].v ? String(row.c[1].v).trim() : "";
           var archivedAt = row.c[2] && row.c[2].v ? String(row.c[2].v).trim() : "";
-          if (label && sheetName) runs.push({ label: label, sheetName: sheetName, archivedAt: archivedAt });
+          if (!label || !sheetName) return;
+          if (label === "Label" && sheetName === "SheetName") return; // Kopfzeile überspringen, falls vorhanden
+          runs.push({ label: label, sheetName: sheetName, archivedAt: archivedAt });
         });
       }
       ngRuns = runs;
